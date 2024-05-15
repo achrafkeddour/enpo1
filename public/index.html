@@ -35,7 +35,7 @@
             display: flex;
         }
         #userList {
-            width: 60%;
+            width: 25%;
             background-color: #fff;
             border-right: 1px solid #ccc;
             flex-direction: column;
@@ -168,6 +168,12 @@
         .dark-mode .online-status {
             background-color: #4a4a4a;
         }
+
+        @media only screen and (max-width: 800px) {
+            #userList {
+                width: 82%!important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -179,7 +185,7 @@
                 <button class="btn btn-secondary mt-2" onclick="toggleDarkMode()">Toggle Dark Mode</button>
             </div>
         </div>
-        <div id="userList" class="list-group">
+        <div id="userList" class="list-group"><h3 style="margin-bottom:-10px ;">Online Users :</h3><br><p style="font-size: 15px;">Select one to chat with</p>
             <!-- Users will be listed here -->
         </div>
         <div id="conversationView">
@@ -306,7 +312,7 @@
             });
 
             socket.on('updateUserList', function(users) {
-                $('#userList').empty();
+                /*$('#userList').empty();*/
                 users.forEach(function(user) {
                     $('#userList').append($('<button class="list-group-item list-group-item-action user-item">').html(`<span class="online-status"></span>${user}`).click(function() {
                         $(this).find('.online-status').removeClass('font-weight-bold');
