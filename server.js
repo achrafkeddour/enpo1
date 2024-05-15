@@ -44,13 +44,27 @@ io.on('connection', (socket) => {
         io.emit('updateUserList', Object.keys(users));
     });
 
-    socket.on('private message', ({ recipient, message, imageUrl }) => {
+    socket.on('private message', ({ recipient, message, fileUrl }) => {
         if (users[recipient]) {
             io.to(users[recipient]).emit('private message', {
                 sender: socket.username,
                 message,
-                imageUrl
+                fileUrl
             });
+            // Emit read receipt
+            socket.emit('read', recipient);
+        }
+    });
+
+    socket.on('typing', ({ recipient, typing }) => {
+        if (users[recipient]) {
+            io.to(users[recipient]).emit('typing', { sender: socket.username, typing });
+        }
+    });
+
+    socket.on('read', (recipient) => {
+        if (users[recipient]) {
+            io.to(users[recipient]).emit('read', socket.username);
         }
     });
 
@@ -61,13 +75,12 @@ io.on('connection', (socket) => {
     });
 });
 
-// Endpoint for image upload
-app.post('/upload', upload.single('image'), (req, res) => {
-    res.json({ imageUrl: `/uploads/${req.file.filename}` });
+// Endpoint for file upload
+app.post('/upload', upload.single('file'), (req, res) => {
+    res.json({ fileUrl: `/uploads/${req.file.filename}` });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
- 
