@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Messenger Clone</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         body, html {
             height: 100%;
@@ -39,6 +38,7 @@
             background-color: #fff;
             border-right: 1px solid #ccc;
             flex-direction: column;
+            padding: 10px;
         }
         #conversationView {
             flex: 1;
@@ -68,6 +68,7 @@
             max-width: 60%;
             word-wrap: break-word;
             display: inline-block;
+            position: relative;
         }
         .message.sent {
             background-color: #dcf8c6;
@@ -76,6 +77,13 @@
         .message.received {
             background-color: #fff;
             align-self: flex-start;
+        }
+        .message .timestamp {
+            font-size: 0.75em;
+            color: #888;
+            position: absolute;
+            bottom: -1.2em;
+            right: 10px;
         }
         #form {
             display: flex;
@@ -110,10 +118,23 @@
         .btn-primary {
             border-radius: 20px;
         }
-        .typing-indicator {
+        .online-status {
+            width: 10px;
+            height: 10px;
+            background-color: green;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .user-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #typingIndicator {
             font-size: 0.85em;
-            color: #aaa;
-            margin: 5px 0;
+            color: #888;
+            margin-bottom: 5px;
         }
     </style>
 </head>
@@ -132,15 +153,15 @@
             <div id="conversationHeader">
                 <button class="btn btn-secondary" onclick="showUserList()">Back</button>
                 <h5 id="conversationTitle">Conversation</h5>
-                <small id="typingIndicator" class="typing-indicator"></small>
             </div>
             <div id="messages" class="list-unstyled">
                 <!-- Messages will appear here -->
             </div>
+            <div id="typingIndicator"></div>
             <form id="form">
                 <textarea id="message" class="form-control" placeholder="Type a message..." rows="2"></textarea>
-                <label for="fileUpload"><i class="fa fa-paperclip"></i> Attach</label>
-                <input type="file" id="fileUpload" class="form-control invut">
+                <label for="image"><i class="fa fa-paperclip"></i> Attach</label>
+                <input type="file" id="image" class="form-control invut">
                 <button class="btn btn-primary">Send</button>
             </form>
         </div>
@@ -173,29 +194,27 @@
             $('#conversationView').addClass('active');
             $('#conversationTitle').text(`Conversation with ${recipient}`);
             $('#messages').empty();
-            socket.emit('read', recipient); // Mark messages as read
-        }
-
-        function updateTyping() {
-            socket.emit('typing', { recipient: currentRecipient, typing: true });
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                socket.emit('typing', { recipient: currentRecipient, typing: false });
-            }, 3000);
+            $('#typingIndicator').text('');
         }
 
         $(function () {
-            $('#message').on('input', updateTyping);
+            $('#message').on('input', function() {
+                clearTimeout(typingTimeout);
+                socket.emit('typing', { recipient: currentRecipient });
+                typingTimeout = setTimeout(function() {
+                    socket.emit('stop typing', { recipient: currentRecipient });
+                }, 2000);
+            });
 
             $('form').submit(function(event) {
                 event.preventDefault();
                 var message = $('#message').val();
-                var fileInput = $('#fileUpload')[0];
+                var fileInput = $('#image')[0];
                 var formData = new FormData();
         
                 if (currentRecipient && (message || fileInput.files.length > 0)) {
                     if (fileInput.files.length > 0) {
-                        formData.append('file', fileInput.files[0]);
+                        formData.append('image', fileInput.files[0]);
                         $.ajax({
                             url: '/upload',
                             type: 'POST',
@@ -203,36 +222,35 @@
                             processData: false,
                             contentType: false,
                             success: function(data) {
-                                socket.emit('private message', { recipient: currentRecipient, message, fileUrl: data.fileUrl });
+                                socket.emit('private message', { recipient: currentRecipient, message, imageUrl: data.imageUrl });
                                 if (message) {
-                                    $('#messages').append($('<div class="message sent">').text(message));
+                                    $('#messages').append($('<div class="message sent">').text(message).append(`<span class="timestamp">${new Date().toLocaleTimeString()}</span>`));
                                 }
-                                $('#messages').append($('<div class="message sent">').html(`<a href="${data.fileUrl}" target="_blank">Download File</a>`));
+                                $('#messages').append($('<div class="message sent">').html(`<img src="${data.imageUrl}" class="img-fluid">`).append(`<span class="timestamp">${new Date().toLocaleTimeString()}</span>`));
                                 $('#message').val('');
-                                $('#fileUpload').val('');
+                                $('#image').val('');
                             },
                             error: function(err) {
-                                alert('Error uploading file.');
+                                alert('Error uploading image.');
                             }
                         });
                     } else {
                         socket.emit('private message', { recipient: currentRecipient, message });
-                        $('#messages').append($('<div class="message sent">').text(message));
+                        $('#messages').append($('<div class="message sent">').text(message).append(`<span class="timestamp">${new Date().toLocaleTimeString()}</span>`));
                         $('#message').val('');
                     }
                 }
             });
-
-            socket.on('private message', function({ sender, message, fileUrl }) {
+        
+            socket.on('private message', function({ sender, message, imageUrl }) {
                 if (currentRecipient === sender) {
                     if (message) {
-                        $('#messages').append($('<div class="message received">').text(message));
+                        $('#messages').append($('<div class="message received">').text(message).append(`<span class="timestamp">${new Date().toLocaleTimeString()}</span>`));
                     }
-                    if (fileUrl) {
-                        $('#messages').append($('<div class="message received">').html(`<a href="${fileUrl}" target="_blank">Download File</a>`));
+                    if (imageUrl) {
+                        $('#messages').append($('<div class="message received">').html(`<img src="${imageUrl}" class="img-fluid">`).append(`<span class="timestamp">${new Date().toLocaleTimeString()}</span>`));
                     }
                 } else {
-                    // Highlight the user in the user list
                     $('#userList button').each(function() {
                         if ($(this).text() === sender) {
                             $(this).addClass('font-weight-bold');
@@ -244,41 +262,22 @@
             socket.on('updateUserList', function(users) {
                 $('#userList').empty();
                 users.forEach(function(user) {
-                    $('#userList').append($('<button class="list-group-item list-group-item-action">').text(user).click(function() {
-                        $(this).removeClass('font-weight-bold');
+                    $('#userList').append($('<button class="list-group-item list-group-item-action user-item">').html(`<span class="online-status"></span>${user}`).click(function() {
+                        $(this).find('.online-status').removeClass('font-weight-bold');
                         showConversation(user);
                     }));
                 });
             });
 
-            socket.on('typing', function({ sender, typing }) {
+            socket.on('typing', function({ sender }) {
                 if (currentRecipient === sender) {
-                    $('#typingIndicator').text(typing ? 'Typing...' : '');
+                    $('#typingIndicator').text(`${sender} is typing...`);
                 }
             });
 
-            socket.on('read', function(sender) {
+            socket.on('stop typing', function({ sender }) {
                 if (currentRecipient === sender) {
-                    // Handle read receipt, e.g., mark messages as read
-                }
-            });
-
-            if (Notification.permission !== "granted") {
-                Notification.requestPermission();
-            }
-
-            function notifyUser(message) {
-                if (Notification.permission === "granted") {
-                    new Notification('New message', {
-                        body: message,
-                        icon: 'path/to/icon.png' // Optional icon
-                    });
-                }
-            }
-
-            socket.on('private message', function({ sender, message, fileUrl }) {
-                if (currentRecipient !== sender) {
-                    notifyUser(`New message from ${sender}`);
+                    $('#typingIndicator').text('');
                 }
             });
         });
